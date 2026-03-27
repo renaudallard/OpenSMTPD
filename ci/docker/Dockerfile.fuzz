@@ -8,13 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	bison \
 	build-essential \
 	clang \
-	compiler-rt \
 	libevent-dev \
 	libssl-dev \
 	libtool \
 	llvm \
 	pkgconf \
 	zlib1g-dev \
+	&& apt-get install -y --no-install-recommends \
+	libclang-rt-$(clang --version | grep -oP 'clang version \K[0-9]+')-dev \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Create users required by configure
