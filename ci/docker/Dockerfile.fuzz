@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	bison \
 	build-essential \
 	clang \
+	compiler-rt \
 	libevent-dev \
 	libssl-dev \
 	libtool \
