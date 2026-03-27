@@ -71,6 +71,8 @@ opensmtpd.tgz
 # Clang scan-build
 clang-report/
 
+# Fuzz build artifacts
+fuzz/build/
 
 # TLS certs
 open.smtpd.cert

@@ -1,0 +1,16 @@
+version: 3
+dispatcher: local
+type: mda
+helo: localhost
+hostname: localhost
+errorline:
+sockaddr: local
+sender: sender@example.com
+rcpt: rcpt@example.com
+dest: dest@example.com
+ctime: 1700000000
+expire: 86400
+retry: 0
+last-try: 0
+last-bounce: 0
+ttl: 86400

@@ -1,0 +1,9 @@
+From: sender@example.com
+To: recipient@example.com
+Subject: This is a long subject
+ that is folded across
+ multiple lines
+Content-Type: text/plain;
+	charset="utf-8"
+
+Body.

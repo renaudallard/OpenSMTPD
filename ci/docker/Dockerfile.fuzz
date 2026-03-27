@@ -1,0 +1,38 @@
+FROM ubuntu:latest
+
+WORKDIR /opensmtpd
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	autoconf \
+	automake \
+	bison \
+	build-essential \
+	clang \
+	libevent-dev \
+	libssl-dev \
+	libtool \
+	llvm \
+	pkgconf \
+	zlib1g-dev \
+	&& rm -rf /var/lib/apt/lists/*
+
+# Create users required by configure
+RUN useradd -r -s /usr/sbin/nologin _smtpd 2>/dev/null; \
+	useradd -r -s /usr/sbin/nologin _smtpq 2>/dev/null; \
+	mkdir -p /var/spool/smtpd /var/mail /etc/mail; \
+	true
+
+COPY . /opensmtpd
+
+RUN chmod +x fuzz/build.sh && CC=clang fuzz/build.sh /opensmtpd
+
+# Smoke test: verify each target loads and processes seed corpus only
+RUN for target in /opensmtpd/fuzz/build/fuzz_*; do \
+	name=$(basename "$target"); \
+	corpus="$(echo "$name" | sed 's/^fuzz_//')"; \
+	echo "=== Smoke test: $name ==="; \
+	timeout 10 "$target" \
+		-runs=0 \
+		"/opensmtpd/fuzz/corpus/${corpus}/" \
+		2>&1 | tail -1; \
+	done

@@ -1,0 +1,7 @@
+From: sender@example.com
+To: recipient@example.com
+Subject: Test message
+Date: Thu, 01 Jan 2025 00:00:00 +0000
+MIME-Version: 1.0
+
+This is the body.

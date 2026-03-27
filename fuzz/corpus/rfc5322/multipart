@@ -1,0 +1,9 @@
+From: sender@example.com
+To: a@example.com, b@example.com
+Cc: c@example.com
+Subject: Multi-recipient
+Message-ID: <12345@example.com>
+References: <prev@example.com>
+In-Reply-To: <prev@example.com>
+
+Body text here.

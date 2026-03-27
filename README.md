@@ -240,3 +240,48 @@ Then:
 or in debug and verbose mode
 
     smtpd -dv
+
+## Fuzzing
+
+The `fuzz/` directory contains [libFuzzer](https://llvm.org/docs/LibFuzzer.html)
+harnesses for OpenSMTPD's parsing functions, built with AddressSanitizer and
+UndefinedBehaviorSanitizer.
+
+### Fuzz targets
+
+| Target | Description |
+|--------|-------------|
+| fuzz_rfc5322 | RFC 5322 email header/body parser |
+| fuzz_mailaddr | Email address parsing |
+| fuzz_dns_unpack | DNS packet unpacking (binary) |
+| fuzz_envelope | Envelope deserialization |
+| fuzz_netaddr | Network address CIDR parsing |
+| fuzz_relayhost | Relay host URL parsing |
+| fuzz_credentials | Credentials parsing |
+| fuzz_userinfo | User info parsing |
+| fuzz_expandnode | Alias expand node parsing |
+| fuzz_validation | Email local/domain part validation |
+
+### Build and run locally
+
+Requires Clang with libFuzzer support:
+
+    CC=clang fuzz/build.sh
+    ./fuzz/build/fuzz_mailaddr -max_total_time=60 fuzz/corpus/mailaddr/
+
+### Build and run via Docker
+
+    docker build . -f ci/docker/Dockerfile.fuzz -t opensmtpd:fuzz
+    docker run --rm -v ./artifacts:/artifacts opensmtpd:fuzz \
+        /opensmtpd/fuzz/build/fuzz_dns_unpack \
+        -max_total_time=300 \
+        -artifact_prefix=/artifacts/ \
+        /opensmtpd/fuzz/corpus/dns_unpack/
+
+### CI
+
+The `fuzz.yml` workflow runs all 10 targets in parallel via a matrix strategy.
+Push/PR runs fuzz each target for 60s (~30 min total compute).  The weekly
+scheduled run fuzzes each target for 1200s (~230 min total compute, within a
+4-hour daily budget).  Crash artifacts are uploaded on failure with 30-day
+retention.

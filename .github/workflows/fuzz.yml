@@ -1,0 +1,111 @@
+name: Fuzz Testing
+
+# Budget: max 4 hours (240 min) total compute per day.
+#
+# Push/PR:  build (~10 min) + 10 parallel jobs * ~2 min (60s fuzz + overhead)
+#           = ~30 min total compute
+# Schedule: build (~10 min) + 10 parallel jobs * ~22 min (1200s fuzz + overhead)
+#           = ~230 min total compute
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '0 4 * * 0'  # Weekly Sunday 4am UTC
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build fuzzing container
+      run: docker build . --file ci/docker/Dockerfile.fuzz --tag opensmtpd:fuzz
+
+    - name: Save Docker image
+      run: docker save opensmtpd:fuzz | gzip > /tmp/fuzz-image.tar.gz
+
+    - name: Upload Docker image
+      uses: actions/upload-artifact@v4
+      with:
+        name: fuzz-image
+        path: /tmp/fuzz-image.tar.gz
+        retention-days: 1
+
+  fuzz:
+    needs: build-fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_rfc5322
+          - fuzz_mailaddr
+          - fuzz_dns_unpack
+          - fuzz_envelope
+          - fuzz_netaddr
+          - fuzz_relayhost
+          - fuzz_credentials
+          - fuzz_userinfo
+          - fuzz_expandnode
+          - fuzz_validation
+
+    steps:
+    - name: Download Docker image
+      uses: actions/download-artifact@v4
+      with:
+        name: fuzz-image
+
+    - name: Load Docker image
+      run: gunzip -c fuzz-image.tar.gz | docker load
+
+    - name: Set fuzz duration
+      id: duration
+      run: |
+        if [ "${{ github.event_name }}" = "schedule" ]; then
+          echo "seconds=1200" >> "$GITHUB_OUTPUT"
+        else
+          echo "seconds=60" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run ${{ matrix.target }}
+      run: |
+        mkdir -p artifacts
+        corpus_name=$(echo "${{ matrix.target }}" | sed 's/^fuzz_//')
+        docker run --rm \
+          -v "$(pwd)/artifacts:/artifacts" \
+          opensmtpd:fuzz \
+          sh -c "
+            mkdir -p /artifacts/${{ matrix.target }}
+            /opensmtpd/fuzz/build/${{ matrix.target }} \
+              -max_total_time=${{ steps.duration.outputs.seconds }} \
+              -artifact_prefix=/artifacts/${{ matrix.target }}/ \
+              -print_final_stats=1 \
+              /opensmtpd/fuzz/corpus/${corpus_name}/ \
+              2>&1 || true
+          "
+
+    - name: Check for crashes
+      run: |
+        crashes=$(find artifacts/${{ matrix.target }} -name 'crash-*' -o -name 'leak-*' -o -name 'timeout-*' 2>/dev/null | head -20)
+        if [ -n "$crashes" ]; then
+          echo "::error::Fuzzer found issues in ${{ matrix.target }}:"
+          echo "$crashes"
+          exit 1
+        fi
+
+    - name: Upload crash artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: fuzz-crashes-${{ matrix.target }}
+        path: artifacts/${{ matrix.target }}/
+        retention-days: 30
