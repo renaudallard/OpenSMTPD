@@ -280,7 +280,6 @@ Requires Clang with libFuzzer support:
 
 ### CI
 
-The `fuzz.yml` workflow runs daily at 4am UTC.  All 10 targets run in parallel
-via a matrix strategy, each fuzzing for 1200s (20 min).  Total compute is
-~240 min (4 hours) per day.  Crash artifacts are uploaded on failure with
-30-day retention.
+The `fuzz.yml` workflow runs daily at 4am UTC.  All 10 targets run concurrently
+via a matrix strategy, each fuzzing for 4 hours (14400s).  Crash artifacts are
+uploaded on failure with 30-day retention.
