@@ -1,22 +1,20 @@
 name: Fuzz Testing
 
-# Budget: max 4 hours (240 min) total compute per day.
+# Budget: exactly 4 hours (240 min) total compute per day.
 #
-# Push/PR:  build (~10 min) + 10 parallel jobs * ~2 min (60s fuzz + overhead)
-#           = ~30 min total compute
-# Schedule: build (~10 min) + 10 parallel jobs * ~22 min (1200s fuzz + overhead)
-#           = ~230 min total compute
+# build job:  ~10 min  (1 runner)
+# 10 fuzz jobs in parallel: ~23 min each (1200s fuzz + overhead)
+#             = ~230 min (10 runners)
+# Total       = ~240 min = 4 hours
+#
+# Runs once per day on schedule only, no push/PR triggers.
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
   schedule:
-    - cron: '0 4 * * 0'  # Weekly Sunday 4am UTC
+    - cron: '0 4 * * *'  # Daily at 4am UTC
 
 concurrency:
-  group: fuzz-${{ github.ref }}
+  group: fuzz
   cancel-in-progress: true
 
 jobs:
@@ -42,7 +40,7 @@ jobs:
   fuzz:
     needs: build-fuzz
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -67,15 +65,6 @@ jobs:
     - name: Load Docker image
       run: gunzip -c fuzz-image.tar.gz | docker load
 
-    - name: Set fuzz duration
-      id: duration
-      run: |
-        if [ "${{ github.event_name }}" = "schedule" ]; then
-          echo "seconds=1200" >> "$GITHUB_OUTPUT"
-        else
-          echo "seconds=60" >> "$GITHUB_OUTPUT"
-        fi
-
     - name: Run ${{ matrix.target }}
       run: |
         mkdir -p artifacts
@@ -86,7 +75,7 @@ jobs:
           sh -c "
             mkdir -p /artifacts/${{ matrix.target }}
             /opensmtpd/fuzz/build/${{ matrix.target }} \
-              -max_total_time=${{ steps.duration.outputs.seconds }} \
+              -max_total_time=1200 \
               -artifact_prefix=/artifacts/${{ matrix.target }}/ \
               -print_final_stats=1 \
               /opensmtpd/fuzz/corpus/${corpus_name}/ \
